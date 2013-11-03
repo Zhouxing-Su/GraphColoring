@@ -178,6 +178,7 @@ bool GraphColoring::solve()
     int conflict = minConflict;
 
     for (; (conflict > 0) && (iterCount < 0xefffffff); ++iterCount) {
+        //int bestMoveCount = 0;
         maxReduceSet.clear();
         maxReduceSet.push_back(ReduceInfo());
         for (int i = 0; i < graph->getVertexNum(); ++i) {   // for each vertex that has conflicts
@@ -186,7 +187,14 @@ bool GraphColoring::solve()
                 for (int j = 0; j < colorNum; ++j) {        // for each destination color
                     if (color != j) {                       // test if it is the max reduce
                         int reduce = (adjColorTable->at(i, color) - adjColorTable->at(i,j));
-                        if ((tabuTable->at(i, j) < iterCount)||((conflict - reduce) < minConflict)) {
+                        if ((conflict - reduce) < minConflict) {
+                            if (reduce > maxReduceSet[0].reduce) {
+                                maxReduceSet.clear();
+                                maxReduceSet.push_back(ReduceInfo(reduce,i,j));
+                            } else if ((reduce == maxReduceSet[0].reduce) && (tabuTable->at(i, j) < iterCount)) {
+                                maxReduceSet.push_back(ReduceInfo(reduce,i,j));
+                            }
+                        } else if (tabuTable->at(i, j) < iterCount) {
                             if (reduce > maxReduceSet[0].reduce) {
                                 maxReduceSet.clear();
                                 maxReduceSet.push_back(ReduceInfo(reduce,i,j));
