@@ -9,7 +9,7 @@ int main( int argc, char *argv[] )
     //int colorNum;
     //printf("please input the color number: ");
     //scanf("%d", &colorNum);
-    gc.setColorNum(12);       // step2
+    gc.setColorNum(72);       // step2
 
     if (argc == 2) {
         FILE *input = fopen(argv[argc-1], "r");
@@ -22,9 +22,9 @@ int main( int argc, char *argv[] )
         gc.setupGraph(stdin);       // step3(method2)
     }
 
-    gc.solve();                     // step4
-    gc.check();                     // step5
+    gc.solve(100000000);            // step4
     gc.printResult();               // step6
+    gc.check();                     // step5
 
     return 0;
 }

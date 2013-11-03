@@ -161,8 +161,9 @@ void GraphColoring::setupGraph( FILE *input )
     TabuTenureBase = 0;
 }
 
-bool GraphColoring::solve()
+bool GraphColoring::solve(const int timeOut)
 {
+    clock_t start = clock();
     genAdjColorTable();
     minConflict = evaluate();
 
@@ -174,13 +175,12 @@ bool GraphColoring::solve()
         int desColor;
     } ReduceInfo;
 
-    vector<ReduceInfo> maxReduceSet;
+    ReduceInfo maxReduce;
     int conflict = minConflict;
 
-    for (; (conflict > 0) && (iterCount < 0xefffffff); ++iterCount) {
-        //int bestMoveCount = 0;
-        maxReduceSet.clear();
-        maxReduceSet.push_back(ReduceInfo());
+    for (; (conflict > 0) && (iterCount < timeOut); ++iterCount) {
+        maxReduce = ReduceInfo();
+        int bestMoveCount = 2;
         for (int i = 0; i < graph->getVertexNum(); ++i) {   // for each vertex that has conflicts
             int color = graph->getVertex(i).color;
             if ( adjColorTable->at(i, color) > 0) {
@@ -188,18 +188,24 @@ bool GraphColoring::solve()
                     if (color != j) {                       // test if it is the max reduce
                         int reduce = (adjColorTable->at(i, color) - adjColorTable->at(i,j));
                         if ((conflict - reduce) < minConflict) {
-                            if (reduce > maxReduceSet[0].reduce) {
-                                maxReduceSet.clear();
-                                maxReduceSet.push_back(ReduceInfo(reduce,i,j));
-                            } else if ((reduce == maxReduceSet[0].reduce) && (tabuTable->at(i, j) < iterCount)) {
-                                maxReduceSet.push_back(ReduceInfo(reduce,i,j));
+                            if (reduce > maxReduce.reduce) { // only way for tabu move to be chosen
+                                maxReduce = ReduceInfo(reduce,i,j);
+                                bestMoveCount = 2;
+                            } else if ((reduce == maxReduce.reduce) && (tabuTable->at(i, j) < iterCount)) {
+                                if ((rand() % bestMoveCount) == 0) {
+                                    maxReduce = ReduceInfo(reduce,i,j);
+                                }
+                                ++bestMoveCount;
                             }
                         } else if (tabuTable->at(i, j) < iterCount) {
-                            if (reduce > maxReduceSet[0].reduce) {
-                                maxReduceSet.clear();
-                                maxReduceSet.push_back(ReduceInfo(reduce,i,j));
-                            } else if (reduce == maxReduceSet[0].reduce) {
-                                maxReduceSet.push_back(ReduceInfo(reduce,i,j));
+                            if (reduce > maxReduce.reduce) {
+                                maxReduce = ReduceInfo(reduce,i,j);
+                                bestMoveCount = 2;
+                            } else if (reduce == maxReduce.reduce) {
+                                if ((rand() % bestMoveCount) == 0) {
+                                    maxReduce = ReduceInfo(reduce,i,j);
+                                }
+                                ++bestMoveCount;
                             }
                         }
                     }
@@ -207,7 +213,6 @@ bool GraphColoring::solve()
             }
         }
         
-        ReduceInfo &maxReduce = maxReduceSet[(rand() % maxReduceSet.size())];
         conflict -= maxReduce.reduce;
         minConflict = (minConflict > conflict)?(conflict):(minConflict);
         int srcColor = graph->getVertex(maxReduce.vertex).color;
@@ -222,7 +227,8 @@ bool GraphColoring::solve()
         }
     }
 
-    return true;
+    duration = (clock() - start);
+    return (conflict == 0);
 }
 
 bool GraphColoring::check() const
@@ -255,6 +261,11 @@ void GraphColoring::printResult() const
     for (int i = 0; i < graph->getVertexNum(); ++i) {
         printf("%10d%9d\n", i, graph->getVertex(i).color);
     }
+    printf("\nduration: %lf\niteration: %d\n", (duration / 1000.0), iterCount);
+
+    FILE *flog = fopen("log.csv", "a");
+    fprintf(flog, "\n%d,%d,%lf,%d", graph->getVertexNum(), colorNum, (duration / 1000.0), iterCount);
+    fclose(flog);
 }
 
 void GraphColoring::genAdjColorTable()

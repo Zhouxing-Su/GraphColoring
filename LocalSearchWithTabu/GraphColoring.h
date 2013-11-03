@@ -31,7 +31,7 @@ public:
     int getColorNum() const {    return colorNum;    }
 
     void setupGraph(FILE *input);
-    bool solve();
+    bool solve(const int timeOut);
     bool check() const;
     void printResult() const;
 
@@ -42,6 +42,7 @@ private:
     int minConflict;
     int colorNum;
     int iterCount;
+    clock_t duration;
 
     Graph *graph;
     AdjColorTable *adjColorTable;
