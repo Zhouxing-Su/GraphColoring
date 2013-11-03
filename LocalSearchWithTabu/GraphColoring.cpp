@@ -8,6 +8,7 @@ class GraphColoring::Graph
 
 public:
     Graph(FILE *input);
+    Graph(const Graph &g);
     ~Graph(void);
 
     void setRandColorToVertices(int colorNum);
@@ -39,6 +40,7 @@ class GraphColoring::AdjColorTable
 {
 public:
     AdjColorTable(int vertexNum, int colorNum);
+    AdjColorTable(const AdjColorTable &act);
     ~AdjColorTable();
 
     int& at(int vertex, int color) {    return *(table + (vertex * colorNum) + color);    }
@@ -46,6 +48,7 @@ public:
 private:
     int *table;
     const int colorNum;
+    const int vertexNum;
 };
 
 
@@ -92,6 +95,11 @@ GraphColoring::Graph::Graph(FILE *input)
     }
 }
 
+GraphColoring::Graph::Graph(const Graph &g) : vertexNum(g.vertexNum)
+{
+    adjacencyList = new Vertex[vertexNum];
+    memcpy(adjacencyList, g.adjacencyList, (vertexNum * sizeof(Vertex)));
+}
 
 GraphColoring::Graph::~Graph(void)
 {
@@ -119,10 +127,17 @@ inline GraphColoring::Graph::Vertex& GraphColoring::Graph::getVertex(int index)
 
 
 
-GraphColoring::AdjColorTable::AdjColorTable(int vertexNum, int cn)
-    : table(new int[vertexNum * cn]), colorNum(cn)
+GraphColoring::AdjColorTable::AdjColorTable(int vn, int cn)
+    : table(new int[vn * cn]), colorNum(cn), vertexNum(vn)
 {
     memset(table, 0, vertexNum * colorNum * sizeof(int));
+}
+
+
+GraphColoring::AdjColorTable::AdjColorTable(const AdjColorTable &act)
+    : table(new int[act.vertexNum * act.colorNum]), colorNum(act.colorNum), vertexNum(act.vertexNum)
+{
+    memcpy(table, act.table, vertexNum * colorNum * sizeof(int));
 }
 
 GraphColoring::AdjColorTable::~AdjColorTable()
@@ -136,10 +151,22 @@ GraphColoring::AdjColorTable::~AdjColorTable()
 
 
 
-GraphColoring::GraphColoring() : iterCount(0), graph(NULL), adjColorTable(NULL), tabuTable(NULL)
+GraphColoring::GraphColoring() 
+    : iterCount(0), graph(NULL), adjColorTable(NULL), tabuTable(NULL)
 {
 }
 
+GraphColoring::GraphColoring(const GraphColoring &gc, bool copyConfig)
+    : iterCount(gc.iterCount), graph(NULL), adjColorTable(NULL), tabuTable(NULL)
+{
+    if (copyConfig == true) {
+        minConflict = gc.minConflict;
+        colorNum = gc.colorNum;
+        graph = new Graph(*(gc.graph));
+        adjColorTable = new AdjColorTable(*(gc.adjColorTable));
+        tabuTable = new AdjColorTable(*(gc.tabuTable));
+    }
+}
 
 GraphColoring::~GraphColoring()
 {
@@ -156,16 +183,22 @@ void GraphColoring::setupGraph( FILE *input )
 {
     delete graph;   // drop previous graph
     graph = new Graph(input);
+}
+
+void GraphColoring::initConfig(int cn)
+{
+    colorNum = cn;
     graph->setRandColorToVertices(colorNum);
-    //TabuTenureBase = colorNum/2 + 100;
+    genAdjColorTable();
+    minConflict = evaluate();
+
     TabuTenureBase = 0;
+    //TabuTenureBase = colorNum/2 + 10;
 }
 
 bool GraphColoring::solve(const int timeOut)
 {
     clock_t start = clock();
-    genAdjColorTable();
-    minConflict = evaluate();
 
     typedef struct ReduceInfo {
         ReduceInfo(int r=0x80000000, int v=0, int d=0) : reduce(r), vertex(v), desColor(d) {}
@@ -262,9 +295,13 @@ void GraphColoring::printResult() const
         printf("%10d%9d\n", i, graph->getVertex(i).color);
     }
     printf("\nduration: %lf\niteration: %d\n", (duration / 1000.0), iterCount);
-
+    
     FILE *flog = fopen("log.csv", "a");
-    fprintf(flog, "\n%d,%d,%lf,%d", graph->getVertexNum(), colorNum, (duration / 1000.0), iterCount);
+    if (check() == true) {
+        fprintf(flog, "\n%d,%d,%lf,%d", graph->getVertexNum(), colorNum, (duration / 1000.0), iterCount);
+    } else {
+        fprintf(flog, "\n%d,%d,%lf,TIME_OUT", graph->getVertexNum(), colorNum, (duration / 1000.0));
+    }
     fclose(flog);
 }
 

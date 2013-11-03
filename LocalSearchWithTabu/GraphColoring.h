@@ -1,7 +1,12 @@
 /**
-*   usage:  use input file path as a command line argument.
-*           if there is no command line argument, then input is standard input.
-*           then input the color number you want to test if it is able to color the graph
+*   usage:  step1: construct a GraphColoring object.
+*           step2: call setupGraph() to read the graph from input file.
+*           step3, call initConfig() to set the color number to be test and randomly coloring the graph.
+*           step4, call solve() to search for the result
+*           step5, call printResult to check if it is solved correctly, print result and log to "log.csv".
+*           
+*           if you use copy constructor to the GraphColoring object with (copyConfig == true),
+*           then you can go to step4:solve() directly to continue the original search.
 */
 
 #ifndef GRAPH_COLORING_H
@@ -25,28 +30,33 @@ public:
     int TabuTenureBase;
 
     GraphColoring();
+    GraphColoring(const GraphColoring &gc, bool copyConfig);
     ~GraphColoring();
 
-    void setColorNum(int num) {    colorNum = num;    }
     int getColorNum() const {    return colorNum;    }
 
     void setupGraph(FILE *input);
+    void initConfig(int colorNum);
     bool solve(const int timeOut);
-    bool check() const;
     void printResult() const;
 
 private:
     void genAdjColorTable();
     int evaluate() const;
+    bool check() const;
 
-    int minConflict;
-    int colorNum;
+    int colorNum;       // must be set before init()
     int iterCount;
-    clock_t duration;
+    int minConflict;    // no need to be set in the constructor
+    clock_t duration;   // no need to be set in the constructor
 
     Graph *graph;
     AdjColorTable *adjColorTable;
     AdjColorTable *tabuTable;
+
+    // abandoned methods
+    GraphColoring(const GraphColoring &gc) {}
+    const GraphColoring& operator=(const GraphColoring &gc) {}
 };
 
 
