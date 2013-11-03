@@ -151,18 +151,18 @@ GraphColoring::AdjColorTable::~AdjColorTable()
 
 
 
-GraphColoring::GraphColoring() 
-    : iterCount(0), graph(NULL), adjColorTable(NULL), tabuTable(NULL)
+GraphColoring::GraphColoring(volatile bool *pis) 
+    : iterCount(0), graph(NULL), adjColorTable(NULL), tabuTable(NULL), pIsSolved(pis)
 {
 }
 
 GraphColoring::GraphColoring(const GraphColoring &gc, bool copyConfig)
-    : iterCount(gc.iterCount), graph(NULL), adjColorTable(NULL), tabuTable(NULL)
+    : iterCount(gc.iterCount), graph(NULL), adjColorTable(NULL), tabuTable(NULL), pIsSolved(gc.pIsSolved)
 {
+    graph = new Graph(*(gc.graph));
     if (copyConfig == true) {
         minConflict = gc.minConflict;
         colorNum = gc.colorNum;
-        graph = new Graph(*(gc.graph));
         adjColorTable = new AdjColorTable(*(gc.adjColorTable));
         tabuTable = new AdjColorTable(*(gc.tabuTable));
     }
@@ -198,8 +198,6 @@ void GraphColoring::initConfig(int cn)
 
 bool GraphColoring::solve(const int timeOut)
 {
-    clock_t start = clock();
-
     typedef struct ReduceInfo {
         ReduceInfo(int r=0x80000000, int v=0, int d=0) : reduce(r), vertex(v), desColor(d) {}
         ReduceInfo(const ReduceInfo &ri) : reduce(ri.reduce), vertex(ri.vertex), desColor(ri.desColor) {}
@@ -208,10 +206,24 @@ bool GraphColoring::solve(const int timeOut)
         int desColor;
     } ReduceInfo;
 
+
+
+    clock_t start = clock();
+
+    // check if multiple thread support is needed
+    bool notSolved = false;
+    volatile bool *isSolved;
+    if (pIsSolved == NULL) {    // single thread
+        isSolved = &notSolved;
+    } else {                    // multiple threads
+        isSolved = pIsSolved;
+    }
+
+    // start searching
     ReduceInfo maxReduce;
     int conflict = minConflict;
 
-    for (; (conflict > 0) && (iterCount < timeOut); ++iterCount) {
+    for (; (conflict > 0) && (iterCount < timeOut) && (*isSolved == false); ++iterCount) {
         maxReduce = ReduceInfo();
         int bestMoveCount = 2;
         for (int i = 0; i < graph->getVertexNum(); ++i) {   // for each vertex that has conflicts
@@ -272,7 +284,6 @@ bool GraphColoring::check() const
         printf("The answer is right according to adjacent color table!\n");
     }
 
-
     for (int i = 0; i < graph->getVertexNum(); ++i) {
         int color = graph->getVertex(i).color;
         for (int j = graph->getVertex(i).getAdjVertexNum(); --j >= 0;) {
@@ -290,21 +301,32 @@ bool GraphColoring::check() const
 
 void GraphColoring::printResult() const
 {
+    FILE *flog = fopen("log.csv", "a");
+    if ((pIsSolved != NULL) && (*pIsSolved == true)) {
+        if (check() == true) {
+            printVertexAndColor();
+            fprintf(flog, "\n%d,%d,%lf,%d", graph->getVertexNum(), colorNum, (duration / 1000.0), iterCount);
+            *pIsSolved = true;
+        } else {
+            *pIsSolved = (minConflict == 0);    // in case the first finished thread got a wrong result
+        }
+    } else if (check() == true) {
+        printVertexAndColor();
+        fprintf(flog, "\n%d,%d,%lf,%d", graph->getVertexNum(), colorNum, (duration / 1000.0), iterCount);
+    } else {
+        fprintf(flog, "\n%d,%d,%lf,FAIL_TO_SOLVE", graph->getVertexNum(), colorNum, (duration / 1000.0));
+    }
+    fclose(flog);
+}
+
+void GraphColoring::printVertexAndColor() const
+{
     printf("\n    Vertex    Color\n");
     for (int i = 0; i < graph->getVertexNum(); ++i) {
         printf("%10d%9d\n", i, graph->getVertex(i).color);
     }
     printf("\nduration: %lf\niteration: %d\n", (duration / 1000.0), iterCount);
-    
-    FILE *flog = fopen("log.csv", "a");
-    if (check() == true) {
-        fprintf(flog, "\n%d,%d,%lf,%d", graph->getVertexNum(), colorNum, (duration / 1000.0), iterCount);
-    } else {
-        fprintf(flog, "\n%d,%d,%lf,TIME_OUT", graph->getVertexNum(), colorNum, (duration / 1000.0));
-    }
-    fclose(flog);
 }
-
 void GraphColoring::genAdjColorTable()
 {
     tabuTable = new AdjColorTable(graph->getVertexNum(), colorNum);

@@ -29,7 +29,7 @@ public:
 
     int TabuTenureBase;
 
-    GraphColoring();
+    GraphColoring(volatile bool *pIsSolved=NULL);
     GraphColoring(const GraphColoring &gc, bool copyConfig);
     ~GraphColoring();
 
@@ -44,6 +44,9 @@ private:
     void genAdjColorTable();
     int evaluate() const;
     bool check() const;
+    void printVertexAndColor() const;
+
+    volatile bool *pIsSolved; // used for mutiple thread support
 
     int colorNum;       // must be set before init()
     int iterCount;
